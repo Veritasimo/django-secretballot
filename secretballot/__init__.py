@@ -23,7 +23,8 @@ def enable_voting_on(cls, manager_name='objects',
                     total_name='vote_total',
                     add_vote_name='add_vote',
                     remove_vote_name='remove_vote',
-                    base_manager=None):
+                    base_manager=None,
+					model = None):
     from secretballot.models import Vote
     VOTE_TABLE = Vote._meta.db_table
 
@@ -45,13 +46,16 @@ def enable_voting_on(cls, manager_name='objects',
             base_manager = getattr(cls, manager_name).__class__
         else:
             base_manager = Manager
+	
+	if model is None:
+		model = type(cls)
 
     class VotableManager(base_manager):
 
         def get_query_set(self):
-            db_table = self.model._meta.db_table
-            pk_name = self.model._meta.pk.attname
-            content_type = ContentType.objects.get_for_model(self.model).id
+            db_table = model._meta.db_table
+            pk_name = model._meta.pk.attname
+            content_type = ContentType.objects.get_for_model(model).id
             downvote_query = '(SELECT COUNT(*) from %s WHERE vote=-1 AND object_id=%s.%s AND content_type_id=%s)' % (VOTE_TABLE, db_table, pk_name, content_type)
             upvote_query = '(SELECT COUNT(*) from %s WHERE vote=1 AND object_id=%s.%s AND content_type_id=%s)' % (VOTE_TABLE, db_table, pk_name, content_type)
             return super(VotableManager, self).get_query_set().extra(
@@ -59,9 +63,9 @@ def enable_voting_on(cls, manager_name='objects',
                         downvotes_name: downvote_query})
 
         def from_token(self, token):
-            db_table = self.model._meta.db_table
-            pk_name = self.model._meta.pk.attname
-            content_type = ContentType.objects.get_for_model(self.model).id
+            db_table = model._meta.db_table
+            pk_name = model._meta.pk.attname
+            content_type = ContentType.objects.get_for_model(model).id
             query = '(SELECT vote from %s WHERE token=%%s AND object_id=%s.%s AND content_type_id=%s)' % (VOTE_TABLE, db_table, pk_name, content_type)
             return self.get_query_set().extra(select={'user_vote': query},
                                               select_params=(token,))
